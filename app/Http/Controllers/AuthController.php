@@ -2,20 +2,14 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Hash;
 use App\Models\User;
+use Illuminate\Support\Facades\Hash;
+use Tymon\JWTAuth\Facades\JWTAuth;
+use Tymon\JWTAuth\Exceptions\JWTException;
 
 class AuthController extends Controller
 {
-    /**
-     * Handle user registration.
-     *
-     * @param Request $request
-     * @return \Illuminate\Http\Response
-     */
     public function register(Request $request)
     {
         // Validação dos dados de entrada
@@ -29,21 +23,12 @@ class AuthController extends Controller
         $user = User::create([
             'name' => $request->name,
             'email' => $request->email,
-            'password' => Hash::make($request->password), // Hash da senha
+            'password' => Hash::make($request->password),
         ]);
-
-        // Autenticar o usuário após o registro
-        Auth::login($user);
 
         return response()->json(['message' => 'Usuário registrado com sucesso!'], 201);
     }
 
-    /**
-     * Handle user login.
-     *
-     * @param Request $request
-     * @return \Illuminate\Http\Response
-     */
     public function login(Request $request)
     {
         // Validação dos dados de entrada
@@ -53,23 +38,20 @@ class AuthController extends Controller
         ]);
 
         // Tentativa de autenticação do usuário
-        if (Auth::attempt(['email' => $request->email, 'password' => $request->password])) {
-            // Recupera o usuário autenticado
-            $user = Auth::user();
-            return response()->json(['message' => 'Login bem-sucedido!', 'user' => $user], 200);
+        try {
+            if (!$token = JWTAuth::attempt($request->only('email', 'password'))) {
+                return response()->json(['error' => 'Credenciais inválidas'], 401);
+            }
+        } catch (JWTException $e) {
+            return response()->json(['error' => 'Não foi possível criar o token'], 500);
         }
 
-        return response()->json(['message' => 'Credenciais inválidas.'], 401);
+        return response()->json(compact('token'));
     }
 
-    /**
-     * Handle user logout.
-     *
-     * @return \Illuminate\Http\Response
-     */
     public function logout()
     {
-        Auth::logout();
-        return response()->json(['message' => 'Logout realizado com sucesso!'], 200);
+        auth()->logout();
+        return response()->json(['message' => 'Logout realizado com sucesso!']);
     }
 }
